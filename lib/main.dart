@@ -1,75 +1,62 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:new01/pages/authentication.dart';
 import 'package:new01/pages/splashScreen.dart';
+import 'package:new01/pages/theme_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'pages/home_page.dart';
 import 'pages/login.dart';
 import 'pages/signup.dart';
-
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SharedPreferences.getInstance(); // Initialize SharedPreferences
+  await Firebase.initializeApp(); // Initialize Firebase
+
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => LevelUnlockProvider(),
-      child: MyApp(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => ThemeProvider()),
+        ChangeNotifierProvider(create: (context) => LevelUnlockProvider()),
+      ],
+      child: const MyApp(),
     ),
   );
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
       title: 'Speakease',
-      home: SplashScreenHandler(),
+      theme: ThemeData.light(),
+      darkTheme: ThemeData.dark(),
+      themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      debugShowCheckedModeBanner: false,
+      home:  SplashScreen(), // Start with SplashScreen
     );
-  }
-}
-
-class SplashScreenHandler extends StatefulWidget {
-  @override
-  _SplashScreenHandlerState createState() => _SplashScreenHandlerState();
-}
-
-class _SplashScreenHandlerState extends State<SplashScreenHandler> {
-  @override
-  void initState() {
-    super.initState();
-    _navigateToNextScreen();
-  }
-
-  Future<void> _navigateToNextScreen() async {
-    await Future.delayed(Duration(seconds: 3));
-    await storeClass.getStorage();
-    final bool login = storeClass.store!.getBool('isLogin') ?? false;
-    final String signUp = storeClass.store!.getString('username') ?? 'null';
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => (signUp != 'null')
-            ? (login)
-            ? const MyHomePage()
-            : const LoginPage()
-            : const SignUpPage(),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return splashScreen();
   }
 }
 
 class GetStorage {
-  late SharedPreferences? store;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  late bool isLogin = false;
+  late String username = 'null';
 
   Future<void> getStorage() async {
-    store = await SharedPreferences.getInstance();
+    try {
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc('user1').get();
+      if (userDoc.exists) {
+        isLogin = userDoc['isLogin'] ?? false;
+        username = userDoc['username'] ?? 'null';
+      }
+    } catch (e) {
+      print("Error fetching Firestore data: $e");
+    }
   }
 }
 

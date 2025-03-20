@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "295931642848",
+    "project_id": "speakease-c3e6d",
+    "storage_bucket": "speakease-c3e6d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:295931642848:android:90fd066c1a51e086fa6185",
+        "android_client_info": {
+          "package_name": "com.example.ict_project"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBwytrQKZJKIv8vxKNh8L8eeW3hTZmzcEU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
