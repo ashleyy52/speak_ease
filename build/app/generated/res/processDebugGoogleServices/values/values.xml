@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gcm_defaultSenderId" translatable="false">295931642848</string>
+    <string name="google_api_key" translatable="false">AIzaSyBwytrQKZJKIv8vxKNh8L8eeW3hTZmzcEU</string>
+    <string name="google_app_id" translatable="false">1:295931642848:android:90fd066c1a51e086fa6185</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyBwytrQKZJKIv8vxKNh8L8eeW3hTZmzcEU</string>
+    <string name="google_storage_bucket" translatable="false">speakease-c3e6d.firebasestorage.app</string>
+    <string name="project_id" translatable="false">speakease-c3e6d</string>
+</resources>

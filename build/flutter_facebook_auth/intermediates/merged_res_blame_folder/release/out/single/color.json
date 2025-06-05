@@ -1,0 +1,86 @@
+[
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_hint_foreground_material_light.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_hint_foreground_material_light.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_tint_switch_track.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_tint_switch_track.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/switch_thumb_material_light.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/switch_thumb_material_light.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_secondary_text_material_light.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_secondary_text_material_light.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_background_cache_hint_selector_material_dark.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_background_cache_hint_selector_material_dark.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_hint_foreground_material_dark.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_hint_foreground_material_dark.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_primary_text_material_dark.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_primary_text_material_dark.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_primary_text_disable_only_material_light.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_primary_text_disable_only_material_light.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/switch_thumb_material_dark.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/switch_thumb_material_dark.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_secondary_text_material_dark.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_secondary_text_material_dark.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/com_facebook_button_text_color.xml",
+        "source": "app.meedu.flutter_facebook_auth-jetified-facebook-common-17.0.0-19:/color/com_facebook_button_text_color.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_primary_text_disable_only_material_dark.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_primary_text_disable_only_material_dark.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_primary_text_material_light.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_primary_text_material_light.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_btn_colored_text_material.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_btn_colored_text_material.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_tint_seek_thumb.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_tint_seek_thumb.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_tint_edittext.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_tint_edittext.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_search_url_text.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_search_url_text.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_tint_spinner.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_tint_spinner.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_background_cache_hint_selector_material_light.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_background_cache_hint_selector_material_light.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_tint_btn_checkable.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_tint_btn_checkable.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/color/abc_tint_default.xml",
+        "source": "app.meedu.flutter_facebook_auth-appcompat-1.1.0-10:/color/abc_tint_default.xml"
+    }
+]
