@@ -1,9 +1,11 @@
 import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:lottie/lottie.dart';
 
 class LevelSixScreen extends StatefulWidget {
   const LevelSixScreen({super.key});
@@ -17,34 +19,73 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
   late FlutterTts _flutterTts;
   late AnimationController _confettiController;
 
+  // Animation controllers and visibility flags for EACH word
+  List<AnimationController> _successAnimControllers = [];
+  List<AnimationController> _errorAnimControllers = [];
+  List<bool> _showSuccessAnimations = [];
+  List<bool> _showErrorAnimations = [];
+  List<bool> _showFeedbacks = [];
+  List<String> _currentFeedbacks = [];
+
   // Words for Level 6 - Using food theme
-  List<String> words = ['pizza', 'banana', 'cookie', 'sandwich', 'yogurt'];
+  List<String> words = ['getting ready', 'hearing music', 'on a vacation', 'man running', 'watching movies'];
   List<String> wordImages = [
-    'assets/images/pizza.jpg',
-    'assets/images/banana.jpg',
-    'assets/images/cookie.jpg',
-    'assets/images/sandwich.jpg',
-    'assets/images/yogurt.jpg',
+    'assets/Lottie/oh_no.json',      // Lottie animation
+    'assets/Lottie/hearing.json',      // Static image
+    'assets/Lottie/vacation.json',      // Static image
+    'assets/Lottie/running.json',    // Static image
+    'assets/Lottie/movie.json',     // Lottie animation (example, replace with actual file if available)
   ];
+
+  // Custom gradient colors for each word card (unlocked state)
+  List<List<Color>> cardGradientColors = [
+    [Color(0xfffdfdfd), Color(0xfffdfdfd)],
+    [Color(0xfffdfdfd), Color(0xfffdfdfd)],
+    [Color(0xffeedac1), Color(0xffeedac1)],
+    [Color(0xfffdfdfd), Color(0xfffdfdfd)],
+    [Color(0xfffdfdfd), Color(0xfffdfdfd)],
+  ];
+
+  // Custom gradient colors for locked state
+  List<List<Color>> lockedCardGradientColors = [
+    [Color(0xff757575), Color(0xff757575)],
+    [Color(0xff757575), Color(0xff757575)],
+    [Color(0xff757575), Color(0xff757575)],
+    [Color(0xff757575), Color(0xff757575)],
+    [Color(0xff757575), Color(0xff757575)],
+  ];
+
+  // Feedback phrases
+  List<String> successPhrases = [
+    'Great job!',
+    'Fantastic!',
+    'You did it!',
+    'Amazing!',
+    'Excellent!'
+  ];
+
+  List<String> tryAgainPhrases = [
+    'Try again!',
+    'Almost there!',
+    'Let\'s try once more!',
+    'You can do it!',
+    'Keep trying!'
+  ];
+
   List<bool> wordRecognized = [false, false, false, false, false];
   List<bool> wordUnlocked = [true, false, false, false, false];
   List<bool> isListeningList = [false, false, false, false, false];
   bool isLevelCompleted = false;
 
-  // Timers for inactivity prompts
-  List<Timer?> inactivityTimers = [null, null, null, null, null];
-  final int inactivityTimeoutSeconds = 10;
-
-  // Page controller for the card carousel
   late PageController _pageController;
   int _currentPage = 0;
 
-  // Colors for food theme
-  final Color _primaryColor = const Color(0xFFE91E63); // Pink primary color
-  final Color _accentColor = const Color(0xFFFFC107);  // Amber accent color
-  final Color _backgroundColor1 = const Color(0xFFF8BBD0); // Light pink gradient start
-  final Color _backgroundColor2 = const Color(0xFFEC407A); // Medium pink gradient middle
-  final Color _backgroundColor3 = const Color(0xFFAD1457); // Deep pink gradient end
+  // Colors for kid-friendly theme
+  final Color _primaryColor = const Color(0xFF6A5ACD); // Soft purple
+  final Color _accentColor = const Color(0xFFFF8C00);  // Bright orange
+  final Color _backgroundColor1 = const Color(0xFF8C66FF); // Dark purple gradient start
+  final Color _backgroundColor2 = const Color(0xFF7341E6); // Dark purple gradient middle
+  final Color _backgroundColor3 = const Color(0xFF5E35B1); // Dark purple gradient end // Deep blue gradient end
 
   @override
   void initState() {
@@ -54,32 +95,52 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
     _pageController = PageController(viewportFraction: 0.85, initialPage: 0);
     _loadProgress();
 
-    // Setup animation controller for success animation
     _confettiController = AnimationController(
       duration: const Duration(seconds: 1),
       vsync: this,
     );
 
-    // Listen to page changes
+    for (int i = 0; i < words.length; i++) {
+      _successAnimControllers.add(
+        AnimationController(duration: const Duration(milliseconds: 2000), vsync: this),
+      );
+      _errorAnimControllers.add(
+        AnimationController(duration: const Duration(milliseconds: 2000), vsync: this),
+      );
+      _showSuccessAnimations.add(false);
+      _showErrorAnimations.add(false);
+      _showFeedbacks.add(false);
+      _currentFeedbacks.add('');
+
+      _successAnimControllers[i].addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          setState(() {
+            _showSuccessAnimations[i] = false;
+            _showFeedbacks[i] = false;
+          });
+          _successAnimControllers[i].reset();
+        }
+      });
+
+      _errorAnimControllers[i].addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          setState(() {
+            _showErrorAnimations[i] = false;
+            _showFeedbacks[i] = false;
+          });
+          _errorAnimControllers[i].reset();
+        }
+      });
+    }
+
     _pageController.addListener(() {
       int next = _pageController.page!.round();
       if (_currentPage != next) {
         setState(() {
           _currentPage = next;
         });
-        // Cancel any active timers when changing pages
-        _cancelInactivityTimer(_currentPage);
-        // Start inactivity timer for the new page if word is unlocked
-        if (wordUnlocked[next] && !wordRecognized[next]) {
-          _startInactivityTimer(next);
-        }
       }
     });
-
-    // Start inactivity timer for initial page if unlocked
-    if (wordUnlocked[0] && !wordRecognized[0]) {
-      _startInactivityTimer(0);
-    }
   }
 
   void _loadProgress() async {
@@ -94,7 +155,6 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
       });
     }
 
-    // Check if level is completed
     if (!wordRecognized.contains(false)) {
       setState(() {
         isLevelCompleted = true;
@@ -103,89 +163,66 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
     }
   }
 
-  void _startInactivityTimer(int index) {
-    // Cancel any existing timer first
-    _cancelInactivityTimer(index);
-
-    // Start a new timer
-    inactivityTimers[index] = Timer(Duration(seconds: inactivityTimeoutSeconds), () {
-      if (mounted && wordUnlocked[index] && !wordRecognized[index]) {
-        _promptUserForActivity(index);
-      }
-    });
-  }
-
-  void _cancelInactivityTimer(int index) {
-    inactivityTimers[index]?.cancel();
-    inactivityTimers[index] = null;
-  }
-
-  void _promptUserForActivity(int index) {
-    if (mounted) {
-      // Speak the prompt
-      _flutterTts.speak("Let's try saying ${words[index]}. Tap the mic button and say it.");
-
-      // Show a visual prompt
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Let's practice saying '${words[index]}'!"),
-          backgroundColor: _accentColor,
-          duration: const Duration(seconds: 3),
-          action: SnackBarAction(
-            label: 'Practice',
-            textColor: Colors.white,
-            onPressed: () {
-              _startListening(index);
-            },
-          ),
-        ),
-      );
-
-      // Restart the timer for next prompt
-      _startInactivityTimer(index);
-    }
-  }
-
-  void _markWordAsRecognized(String word) async {
+  void _checkWordPronunciation(String word, bool isPractice) async {
     int index = words.indexOf(word);
-    if (index != -1 && !wordRecognized[index]) {
-      setState(() {
-        wordRecognized[index] = true;
-        _unlockNextWord();
-      });
-
-      // Cancel inactivity timer for this word
-      _cancelInactivityTimer(index);
-
-      // Play success animation
-      _confettiController.forward(from: 0.0);
-
-      // Save progress
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      prefs.setStringList('level6_wordRecognized', wordRecognized.map((e) => e.toString()).toList());
-      prefs.setStringList('level6_wordUnlocked', wordUnlocked.map((e) => e.toString()).toList());
-
-      // Check for level completion
-      if (!wordRecognized.contains(false)) {
+    if (index != -1) {
+      if (!isPractice && !wordRecognized[index]) {
         setState(() {
-          isLevelCompleted = true;
-          prefs.setBool('level7Unlocked', true);
+          wordRecognized[index] = true;
+          _unlockNextWord();
         });
 
-        // Show level completion dialog after a short delay
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _showLevelCompletedDialog();
-        });
-      } else {
-        // Start timer for the next unlocked word that's not recognized
-        for (int i = 0; i < words.length; i++) {
-          if (wordUnlocked[i] && !wordRecognized[i]) {
-            _startInactivityTimer(i);
-            break;
-          }
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        prefs.setStringList('level6_wordRecognized', wordRecognized.map((e) => e.toString()).toList());
+        prefs.setStringList('level6_wordUnlocked', wordUnlocked.map((e) => e.toString()).toList());
+
+        if (!wordRecognized.contains(false)) {
+          setState(() {
+            isLevelCompleted = true;
+            prefs.setBool('level7Unlocked', true);
+          });
+          Future.delayed(const Duration(milliseconds: 2500), () {
+            _showLevelCompletedDialog();
+          });
         }
       }
+
+      _showSuccessAnimationAndFeedback(index);
+      _confettiController.forward(from: 0.0);
+      _playFoodSound(words[index]);
     }
+  }
+
+  void _showSuccessAnimationAndFeedback(int index) {
+    final random = DateTime.now().millisecondsSinceEpoch % successPhrases.length;
+    setState(() {
+      _showSuccessAnimations[index] = true;
+      _showFeedbacks[index] = true;
+      _currentFeedbacks[index] = successPhrases[random];
+    });
+
+    if (_successAnimControllers[index].isAnimating) {
+      _successAnimControllers[index].stop();
+    }
+    _successAnimControllers[index].forward();
+
+    _flutterTts.speak("${successPhrases[random]} You said ${words[index]} correctly!");
+  }
+
+  void _showErrorAnimationAndFeedback(int index) {
+    final random = DateTime.now().millisecondsSinceEpoch % tryAgainPhrases.length;
+    setState(() {
+      _showErrorAnimations[index] = true;
+      _showFeedbacks[index] = true;
+      _currentFeedbacks[index] = tryAgainPhrases[random];
+    });
+
+    if (_errorAnimControllers[index].isAnimating) {
+      _errorAnimControllers[index].stop();
+    }
+    _errorAnimControllers[index].forward();
+
+    _flutterTts.speak("${tryAgainPhrases[random]} Let's try saying ${words[index]} again.");
   }
 
   void _unlockNextWord() {
@@ -194,26 +231,28 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
         setState(() {
           wordUnlocked[i + 1] = true;
         });
-
-        // Start inactivity timer for newly unlocked word if it's the current page
-        if (i + 1 == _currentPage) {
-          _startInactivityTimer(i + 1);
-        }
-
         break;
       }
     }
   }
 
   void _startListening(int index) async {
-    // Cancel any running inactivity timer
-    _cancelInactivityTimer(index);
+    bool isPractice = wordRecognized[index];
+
+    if (_showSuccessAnimations[index] || _showErrorAnimations[index]) {
+      setState(() {
+        _showSuccessAnimations[index] = false;
+        _showErrorAnimations[index] = false;
+        _showFeedbacks[index] = false;
+      });
+      _successAnimControllers[index].reset();
+      _errorAnimControllers[index].reset();
+    }
 
     bool available = await _speech.initialize(
       onStatus: (status) => print('Status: $status'),
       onError: (error) => print('Error: $error'),
     );
-
     if (available) {
       setState(() {
         isListeningList[index] = true;
@@ -224,32 +263,11 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
           if (result.finalResult) {
             String recognizedWord = result.recognizedWords.toLowerCase();
             if (recognizedWord.contains(words[index])) {
-              _markWordAsRecognized(words[index]);
+              _checkWordPronunciation(words[index], isPractice);
               _stopListening(index);
-
-              // Provide positive feedback
-              _flutterTts.speak("Great job saying ${words[index]}!");
-
-              // Play food sound for additional reward
-              _playFoodSound(words[index]);
             } else if (recognizedWord.isNotEmpty) {
-              // Incorrect word was said
               _stopListening(index);
-
-              // Provide guidance
-              _flutterTts.speak("Let's try again. Say ${words[index]}.");
-
-              // Show visual feedback
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("Try again! Please say '${words[index]}'"),
-                  backgroundColor: Colors.orange,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-
-              // Restart inactivity timer
-              _startInactivityTimer(index);
+              _showErrorAnimationAndFeedback(index);
             }
           }
         },
@@ -258,9 +276,6 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
   }
 
   void _playFoodSound(String food) async {
-    // This is a placeholder function - in a real implementation,
-    // you would play a specific sound file for each food
-    // For example: await audioPlayer.play('assets/sounds/$food.mp3');
     print('Playing $food sound');
   }
 
@@ -269,26 +284,10 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
       isListeningList[index] = false;
     });
     _speech.stop();
-
-    // Restart inactivity timer if word not recognized
-    if (!wordRecognized[index]) {
-      _startInactivityTimer(index);
-    }
   }
 
   void _speakWord(String word) async {
-    // Cancel inactivity timer temporarily while speaking
-    int index = words.indexOf(word);
-    if (index != -1) {
-      _cancelInactivityTimer(index);
-    }
-
     await _flutterTts.speak(word);
-
-    // Restart inactivity timer if word is not recognized
-    if (index != -1 && !wordRecognized[index]) {
-      _startInactivityTimer(index);
-    }
   }
 
   void _showLevelCompletedDialog() {
@@ -296,51 +295,75 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.white,
+          title: ShaderMask(
+            shaderCallback: (bounds) => LinearGradient(
+              colors: [Color(0xFFE91E63), Color(0xFFAD1457)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ).createShader(bounds),
+            child: const Text(
+              'LEVEL COMPLETED!',
+              style: TextStyle(fontFamily: 'Impact', fontSize: 24, color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
           ),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            height: 300,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.restaurant, color: Colors.amber, size: 80),
-                const SizedBox(height: 20),
-                const Text(
-                  "Delicious Job!",
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.pink,
-                  ),
+          contentPadding: const EdgeInsets.all(20),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 200,
+                child: Lottie.asset(
+                  'assets/Lottie/penguin.json',
+                  repeat: true,
+                  reverse: false,
+                  animate: true,
                 ),
-                const SizedBox(height: 10),
-                const Text(
-                  "You've completed Level 6!",
-                  style: TextStyle(fontSize: 18),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.pink,
-                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                "Congratulations! You completed all levels.",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(fontSize: 16, color: const Color(0xFF323232)),
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.only(left: 218.0),
+                child: SizedBox(
+                  width: 100,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFE91E63), Color(0xFFAD1457)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: Text(
+                        "Got it!",
+                        style: GoogleFonts.nunito(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text(
-                    "Continue",
-                    style: TextStyle(fontSize: 18, color: Colors.white),
-                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -353,12 +376,14 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
     _flutterTts.stop();
     _pageController.dispose();
     _confettiController.dispose();
-
-    // Cancel all inactivity timers
-    for (int i = 0; i < inactivityTimers.length; i++) {
-      inactivityTimers[i]?.cancel();
+    for (var controller in _successAnimControllers) {
+      controller.stop();
+      controller.dispose();
     }
-
+    for (var controller in _errorAnimControllers) {
+      controller.stop();
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -369,10 +394,6 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text(
-          'Level 6: Food Words',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
-        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
@@ -395,7 +416,7 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
                         SizedBox(height: 8),
                         Text("3. When you say it correctly, you'll unlock the next food!"),
                         SizedBox(height: 8),
-                        Text("4. Complete all foods to finish the level"),
+                        Text("4. You can practice completed words any time!"),
                       ],
                     ),
                     actions: [
@@ -422,80 +443,109 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
         child: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 20),
-
-              // Progress section
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.only(left: 20, right: 20),
                 child: Column(
                   children: [
-                    // Progress label with food icons instead of stars
+                    Row(
+                      children: [
+                        Text(' L E V E L', style: TextStyle(fontFamily: "Impact", fontSize: 20, color: const Color(0xFFFFF780))),
+                        SizedBox(width: 8),
+                        Text('  6', style: TextStyle(fontFamily: "Impact", fontSize: 20, color: const Color(0xFFFDF57F))),
+                      ],
+                    ),
+                    SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Text('Activities'.toUpperCase(), style: TextStyle(fontFamily: "Impact", fontSize: 40, color: const Color(0xFFFDF57F))),
+                      ],
+                    ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          "Your Progress: ${(progress * 100).toInt()}%",
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
                         Row(
                           children: List.generate(5, (index) {
-                            return Icon(
-                              index < (progress * 5).floor() ? Icons.restaurant : Icons.restaurant_outlined,
-                              color: index < (progress * 5).floor() ? Colors.amber : Colors.white70,
-                              size: 24,
+                            bool isFilled = index < (progress * 5).floor();
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Icon(isFilled ? Icons.star : Icons.star_border, color: Colors.black, size: 28),
+                                Icon(isFilled ? Icons.star : Icons.star_border, color: isFilled ? Colors.amber : Colors.white70, size: 24),
+                              ],
                             );
                           }),
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 10),
-
-                    // Improved progress bar
-                    Stack(
-                      children: [
-                        // Background
-                        Container(
-                          height: 45,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(12.5),
-                          ),
-                        ),
-                        // Progress fill
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          height: 45,
-                          width: MediaQuery.of(context).size.width * 0.9 * progress,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Color(0xFFF8BBD0), Color(0xFFAD1457)], // Light pink to deep pink
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _accentColor.withOpacity(0.5),
-                                blurRadius: 6,
-                                offset: const Offset(0, 3),
+                    Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))],
+                      ),
+                      child: Stack(
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOut,
+                            height: 36,
+                            width: MediaQuery.of(context).size.width * 0.9 * progress,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xFFFFEB3B),
+                                  Color(0xFFFFF780),
+                                  Color(0xFFFFAB40),],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
                               ),
-                            ],
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [BoxShadow(color: _accentColor.withOpacity(0.6), blurRadius: 6, spreadRadius: -1, offset: const Offset(0, 1))],
+                            ),
                           ),
-                        ),
-                      ],
+                          if (progress > 0.05)
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                height: 6,
+                                width: MediaQuery.of(context).size.width * 0.9 * progress,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [Colors.white.withOpacity(0.0), Colors.white.withOpacity(0.2), Colors.white.withOpacity(0.0)],
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: List.generate(4, (index) {
+                              final markerProgress = (index + 1) / 5;
+                              final markerReached = progress >= markerProgress;
+                              return Container(
+                                width: 2,
+                                height: 8,
+                                margin: EdgeInsets.only(top: 4),
+                                decoration: BoxDecoration(
+                                  color: markerReached ? Colors.white.withOpacity(0.6) : Colors.white.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(9),
+                                ),
+                              );
+                            }),
+                          ),
+                          Center(child: Text("${(progress * 100).toInt()}%", style: const TextStyle(fontFamily: "Impact", fontSize: 20, color: Color(0x80fdf7f7)))),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-
               const SizedBox(height: 30),
-
-              // Word Cards as PageView
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
@@ -505,8 +555,6 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
                   },
                 ),
               ),
-
-              // Navigation dots
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Row(
@@ -535,6 +583,7 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
   Widget _buildWordCard(int index) {
     final bool isCurrentWordUnlocked = wordUnlocked[index];
     final bool isCurrentWordRecognized = wordRecognized[index];
+    final bool isLottie = wordImages[index].endsWith('.json');
 
     return AnimatedScale(
       scale: _currentPage == index ? 1.0 : 0.9,
@@ -555,241 +604,199 @@ class _LevelSixScreenState extends State<LevelSixScreen> with TickerProviderStat
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
               gradient: isCurrentWordUnlocked
-                  ? LinearGradient(
-                colors: [Color(0xffffffff), Colors.grey.shade300],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              )
-                  : LinearGradient(
-                colors: [Colors.grey.shade700, Colors.grey.shade900],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
+                  ? LinearGradient(colors: cardGradientColors[index], begin: Alignment.topCenter, end: Alignment.bottomCenter)
+                  : LinearGradient(colors: lockedCardGradientColors[index], begin: Alignment.topCenter, end: Alignment.bottomCenter),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Word badge at the top
                 if (isCurrentWordRecognized)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Row(
+                    decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(16)),
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.check_circle, color: Colors.white, size: 16),
                         SizedBox(width: 4),
-                        Text(
-                          "Completed!",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        Text("Completed!", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
-
                 const SizedBox(height: 20),
-
-                // Word image in a decorative frame with food-themed pattern
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Decorative border
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: _primaryColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(
-                          color: _primaryColor.withOpacity(0.5),
-                          width: 2,
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          height: 200,
+                          width: 220,
+                          child: isLottie
+                              ? Lottie.asset(
+                            wordImages[index],
+                           // fit: BoxFit.cover,
+                            repeat: true,
+                            animate: isCurrentWordUnlocked, // Stop animation if locked
+                          )
+                              : Image.asset(
+                            wordImages[index],
+                            height: 220,
+                            width: 220,
+                            fit: BoxFit.cover,
+                            color: isCurrentWordUnlocked ? null : Colors.grey.withOpacity(0.7),
+                            colorBlendMode: isCurrentWordUnlocked ? null : BlendMode.saturation,
+                          ),
+                        ),
+                        if (!isCurrentWordUnlocked)
+                          Positioned.fill(
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+                              child: Container(color: Colors.black.withOpacity(0.1)),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  words[index].toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                    color: isCurrentWordUnlocked ? _primaryColor : Colors.white60,
+                  ),
+                ),
+                if (isCurrentWordRecognized && isCurrentWordUnlocked && !(_showSuccessAnimations[index] || _showErrorAnimations[index]))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      "Tap buttons below to practice!",
+                      style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic, color: _primaryColor.withOpacity(0.8)),
+                    ),
+                  ),
+                if (_showFeedbacks[index])
+                  AnimatedOpacity(
+                    opacity: _showFeedbacks[index] ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 300),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Text(
+                        _currentFeedbacks[index],
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: _showSuccessAnimations[index]
+                              ? Colors.green
+                              : _showErrorAnimations[index]
+                              ? Colors.red
+                              : _primaryColor,
                         ),
                       ),
-                      child: const SizedBox(
-                        height: 220,
-                        width: 220,
-                      ),
                     ),
-
-                    // Actual image
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Stack(
+                  ),
+                const SizedBox(height: 30),
+                if (isCurrentWordUnlocked)
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      AnimatedOpacity(
+                        opacity: (_showSuccessAnimations[index] || _showErrorAnimations[index]) ? 0.0 : 1.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Image.asset(
-                              wordImages[index],
-                              height: 220,
-                              width: 220,
-                              fit: BoxFit.cover,
-                              color: isCurrentWordUnlocked ? null : Colors.grey.withOpacity(0.7),
-                              colorBlendMode: isCurrentWordUnlocked ? null : BlendMode.saturation,
-                            ),
-                            if (!isCurrentWordUnlocked)
-                              Positioned.fill(
-                                child: BackdropFilter(
-                                  filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-                                  child: Container(
-                                    color: Colors.black.withOpacity(0.1),
-                                  ),
+                            InkWell(
+                              onTap: () => _speakWord(words[index]),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: _primaryColor,
+                                  borderRadius: BorderRadius.circular(18),
+                                  boxShadow: [BoxShadow(color: _primaryColor.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 4))],
+                                ),
+                                child: Column(
+                                  children: [
+                                    const Icon(Icons.volume_up, color: Colors.white, size: 32),
+                                    const SizedBox(height: 6),
+                                    const Text("HEAR", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                  ],
                                 ),
                               ),
+                            ),
+                            const SizedBox(width: 24),
+                            InkWell(
+                              onTap: isListeningList[index] ? () => _stopListening(index) : () => _startListening(index),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: isListeningList[index] ? Colors.red : _accentColor,
+                                  borderRadius: BorderRadius.circular(18),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (isListeningList[index] ? Colors.red : _accentColor).withOpacity(0.4),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    )
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(isListeningList[index] ? Icons.stop : Icons.mic, color: Colors.white, size: 32),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      isListeningList[index] ? "STOP" : "SPEAK",
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
-                // Word display with food icon
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (isCurrentWordUnlocked)
-                      Icon(
-                        Icons.restaurant,
-                        color: _primaryColor,
-                        size: 24,
-                      ),
-                    const SizedBox(width: 8),
-                    Text(
-                      words[index].toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
-                        color: isCurrentWordUnlocked ? _primaryColor : Colors.white60,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (isCurrentWordUnlocked)
-                      Icon(
-                        Icons.restaurant,
-                        color: _primaryColor,
-                        size: 24,
-                      ),
-                  ],
-                ),
-
-                const SizedBox(height: 30),
-
-                // Action buttons
-                if (isCurrentWordUnlocked)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Hear button
-                      InkWell(
-                        onTap: () => _speakWord(words[index]),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: _primaryColor,
-                            borderRadius: BorderRadius.circular(18),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _primaryColor.withOpacity(0.4),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              const Icon(Icons.volume_up, color: Colors.white, size: 32),
-                              const SizedBox(height: 6),
-                              const Text(
-                                "HEAR",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
+                      if (_showSuccessAnimations[index])
+                        AnimatedOpacity(
+                          opacity: _showSuccessAnimations[index] ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 700),
+                          child: SizedBox(
+                            width: 150,
+                            height: 150,
+                            child: Lottie.asset(
+                              'assets/Lottie/correct_animation.json',
+                              controller: _successAnimControllers[index],
+                              repeat: false,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
-                      ),
-
-                      const SizedBox(width: 24),
-
-                      // Speak button
-                      InkWell(
-                        onTap: isListeningList[index]
-                            ? () => _stopListening(index)
-                            : () => _startListening(index),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isListeningList[index] ? Colors.red : _accentColor,
-                            borderRadius: BorderRadius.circular(18),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (isListeningList[index] ? Colors.red : _accentColor).withOpacity(0.4),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              Icon(
-                                  isListeningList[index] ? Icons.stop : Icons.mic,
-                                  color: Colors.white,
-                                  size: 32
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                isListeningList[index] ? "STOP" : "SPEAK",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
+                      if (_showErrorAnimations[index])
+                        AnimatedOpacity(
+                          opacity: _showErrorAnimations[index] ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 3500),
+                          child: SizedBox(
+                            width: 180,
+                            height: 130,
+                            child: Lottie.asset(
+                              'assets/Lottie/error_og.json',
+                              controller: _errorAnimControllers[index],
+                              repeat: true,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
-
-                // Lock icon and text for locked words
                 if (!isCurrentWordUnlocked)
                   Column(
                     children: [
-                      const Icon(
-                          Icons.lock,
-                          color: Colors.white70,
-                          size: 50
-                      ),
+                      const Icon(Icons.lock, color: Colors.white70, size: 50),
                       const SizedBox(height: 10),
-                      Text(
-                        "Complete previous word to unlock",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 16,
-                        ),
-                      ),
+                      Text("Complete previous word to unlock", style: TextStyle(color: Colors.white70, fontSize: 16)),
                     ],
                   ),
               ],

@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // For Firestore
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:lottie/lottie.dart';
+import 'package:lottie/lottie.dart'; // For UserDetailsPage
+import 'package:new01/pages/ui/userdetails.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-
 import 'PhoneAuth.dart';
 import 'authentication.dart';
-
 import 'home_page.dart';
 import 'signup.dart';
 
@@ -25,14 +25,12 @@ class CustomScrollPhysics extends BouncingScrollPhysics {
 
   @override
   double applyBoundaryConditions(ScrollMetrics position, double value) {
-    // Prevent bouncing only at the top (value < 0)
     if (value > 0) {
       return value;
     }
     if (value < 0) {
       return value;
     }
-    // Allow normal bouncing behavior at the bottom
     return super.applyBoundaryConditions(position, value);
   }
 }
@@ -48,6 +46,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Firestore instance
   bool obscurePassword = true;
   bool isLoading = false;
   String socialLoginProvider = '';
@@ -70,30 +70,47 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     super.dispose();
   }
 
+  // Helper method to check Firestore and navigate (used only for social logins)
+  Future<void> _checkUserDetailsAndNavigate(User user) async {
+    try {
+      final docSnapshot = await _firestore.collection('users').doc(user.uid).get();
+      if (docSnapshot.exists) {
+        // User details exist, navigate to HomePage
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => MyHomePage()),
+        );
+      } else {
+        // No user details, navigate to UserDetailsPage
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => UserDetailsPage(
+              userId: user.uid,
+              initialEmail: user.email ?? '',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      _showErrorSnackBar('Error checking user details: ${e.toString()}');
+    }
+  }
+
   Future<void> _login() async {
     if (formKey.currentState!.validate()) {
       setState(() {
         isLoading = true;
       });
       try {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
+        await _auth.signInWithEmailAndPassword(
           email: emailController.text.trim(),
           password: passController.text.trim(),
         );
+        // Directly navigate to MyHomePage for email login
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => MyHomePage()),
         );
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Login failed: ${e.toString()}'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
+        _showErrorSnackBar('Login failed: ${e.toString()}');
       } finally {
         setState(() {
           isLoading = false;
@@ -112,7 +129,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
 
       if (googleUser == null) {
-        // User canceled the sign-in flow
         setState(() {
           isLoading = false;
           socialLoginProvider = '';
@@ -126,10 +142,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         idToken: googleAuth.idToken,
       );
 
-      await FirebaseAuth.instance.signInWithCredential(credential);
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => MyHomePage()),
-      );
+      UserCredential userCredential = await _auth.signInWithCredential(credential);
+      await _checkUserDetailsAndNavigate(userCredential.user!);
     } catch (e) {
       _showErrorSnackBar('Google sign-in failed: ${e.toString()}');
     } finally {
@@ -164,10 +178,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         accessToken: credential.authorizationCode,
       );
 
-      await FirebaseAuth.instance.signInWithCredential(oauthCredential);
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => MyHomePage()),
-      );
+      UserCredential userCredential = await _auth.signInWithCredential(oauthCredential);
+      await _checkUserDetailsAndNavigate(userCredential.user!);
     } catch (e) {
       _showErrorSnackBar('Apple sign-in failed: ${e.toString()}');
     } finally {
@@ -191,10 +203,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         final AccessToken accessToken = result.accessToken!;
         final OAuthCredential credential = FacebookAuthProvider.credential(accessToken.token);
 
-        await FirebaseAuth.instance.signInWithCredential(credential);
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => MyHomePage()),
-        );
+        UserCredential userCredential = await _auth.signInWithCredential(credential);
+        await _checkUserDetailsAndNavigate(userCredential.user!);
       } else if (result.status == LoginStatus.cancelled) {
         // User canceled the sign-in flow
       } else {
@@ -313,7 +323,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     });
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      await _auth.sendPasswordResetEmail(email: email);
       _showSuccessSnackBar('Password reset link sent to $email');
     } catch (e) {
       _showErrorSnackBar('Failed to send reset email: ${e.toString()}');
@@ -397,11 +407,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         height: MediaQuery.of(context).size.height,
         width: MediaQuery.of(context).size.width,
         child: SingleChildScrollView(
-          // Use custom scroll physics instead of BouncingScrollPhysics
           physics: const CustomScrollPhysics(),
           child: Stack(
             children: [
-              // Lottie Animation
               Positioned(
                 top: screenHeight * 0.01,
                 left: 0,
@@ -414,54 +422,50 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   ),
                 ),
               ),
+              Positioned(
+                top: 90, // Slightly adjusted for better balance
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 25),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'WELCOME',
+                        style: TextStyle(
+                          fontFamily: 'Impact', // Use Impact font
+                          fontSize: 64, // Reduced for elegance
+                          //fontWeight: FontWeight.w600, // Slightly lighter for refinement
+                          letterSpacing: 0.5, // Condensed for a polished look
+                          height: 1.1, // Tighter line height
+                          color: Colors.black, // Base color for ShaderMask
+                        ),
+                      ),
 
-              Padding(
-                padding: const EdgeInsets.only(top: 128.0, left: 25),
-                child: Transform.scale(
-                  scaleY: 2.5,
-                  scaleX: 1.0,
-                  child: Text(
-                    'WELCOME',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: "Impact",
-                      fontSize: 55,
-                      color: Color(0xFF323232),
-                      height: 1.0,
-                    ),
+                      const SizedBox(height: 2), // Reduced spacing for compactness
+                      Text(
+                        'BACK!',
+                        style: TextStyle(
+                        fontFamily: 'Impact', // Use Impact font
+                        fontSize: 64, // Reduced for elegance
+                        //fontWeight: FontWeight.w600, // Slightly lighter for refinement
+                        letterSpacing: 0.5, // Condensed for a polished look
+                        height: 1.1, // Tighter line height
+                        color: Color(0xfffdaa40), // Base color for ShaderMask
+                      ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-
-              Padding(
-                padding: const EdgeInsets.only(top: 230, left: 26),
-                child: Transform.scale(
-                  scaleY: 2.0,
-                  scaleX: 1.0,
-                  child: Text(
-                    'BACK!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: "Impact",
-                      fontSize: 55,
-                      color: Color(0xFFFDAA40),
-                      height: 1.0,
-                    ),
-                  ),
-                ),
-              ),
-
-              // Main content
               SafeArea(
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       SizedBox(height: screenHeight * 0.28),
-
                       const SizedBox(height: 40),
-
-                      // Login Form
                       Container(
                         margin: const EdgeInsets.symmetric(horizontal: 24),
                         decoration: BoxDecoration(
@@ -482,7 +486,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                // Email Input
                                 Text(
                                   'Email',
                                   style: GoogleFonts.nunito(
@@ -522,8 +525,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                   ),
                                 ),
                                 const SizedBox(height: 24),
-
-                                // Password Input
                                 Text(
                                   'Password',
                                   style: GoogleFonts.nunito(
@@ -574,7 +575,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                     errorStyle: TextStyle(color: Colors.redAccent),
                                   ),
                                 ),
-
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: TextButton(
@@ -592,10 +592,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                     ),
                                   ),
                                 ),
-
                                 const SizedBox(height: 24),
-
-                                // Login Button
                                 SizedBox(
                                   height: 56,
                                   child: ElevatedButton(
@@ -633,10 +630,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
-                      // Or continue with section
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Row(
@@ -667,10 +661,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 28),
-
-                      // Social login buttons
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Row(
@@ -680,19 +671,16 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             const SizedBox(width: 16),
                             _buildSocialButton(Icons.apple, 'Apple', _signInWithApple),
                             const SizedBox(width: 16),
-                            _buildSocialButton(Icons.facebook, 'Facebook', _signInWithFacebook ),
+                            _buildSocialButton(Icons.facebook, 'Facebook', _signInWithFacebook),
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 12),
-
-                      // Sign Up Link
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'Dont have an account?',
+                            'Don’t have an account?',
                             style: GoogleFonts.nunito(
                               color: Colors.black54,
                               fontSize: 14,
@@ -769,8 +757,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         ),
         child: platform == 'Google'
             ? Image.asset(
-          'assets/images/google.png', // Path to your custom Google logo
-          width: 28, // Adjust the size as needed
+          'assets/images/google.png',
+          width: 28,
           height: 28,
         )
             : Icon(

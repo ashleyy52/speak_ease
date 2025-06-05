@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:lottie/lottie.dart';
 import 'package:new01/pages/signup.dart';
-import 'package:new01/pages/userdetails.dart';
+import 'package:new01/pages/ui/userdetails.dart';
 import 'PhoneAuth.dart';
 import 'home_page.dart';
 import 'login.dart';

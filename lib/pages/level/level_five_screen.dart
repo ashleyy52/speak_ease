@@ -1,9 +1,11 @@
 import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:lottie/lottie.dart';
 
 class LevelFiveScreen extends StatefulWidget {
   const LevelFiveScreen({super.key});
@@ -17,15 +19,61 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
   late FlutterTts _flutterTts;
   late AnimationController _confettiController;
 
+  // Animation controllers and visibility flags for EACH word
+  List<AnimationController> _successAnimControllers = [];
+  List<AnimationController> _errorAnimControllers = [];
+  List<bool> _showSuccessAnimations = [];
+  List<bool> _showErrorAnimations = [];
+  List<bool> _showFeedbacks = [];
+  List<String> _currentFeedbacks = [];
+
   // Words for Level 5 - Using animal theme
   List<String> words = ['tiger', 'dolphin', 'parrot', 'elephant', 'penguin'];
+
+  // Updated wordImages to match the animal theme with a mix of static images and Lottie animations
   List<String> wordImages = [
-    'assets/images/tiger.jpg',
-    'assets/images/dolphin.jpg',
-    'assets/images/parrot.jpg',
-    'assets/images/elephant.jpg',
-    'assets/images/penguin.jpg',
+    'assets/Lottie/tiger.json',      // Lottie animation for "cat"
+    'assets/Lottie/dolphin.json',      // Lottie animation for "dog"
+    'assets/Lottie/parrot.json',      // Lottie animation for "car"
+    'assets/Lottie/elephant.json',      // Lottie animation for "bug"
+    'assets/Lottie/nigga.json',    // Lottie animation for "penguin"
   ];
+
+  // Custom gradient colors for each word card (unlocked state)
+  List<List<Color>> cardGradientColors = [
+    [Color(0xfffdfdfd), Color(0xfffdfdfd)],  // Gradient for "tiger"
+    [Color(0xfffdfdfd), Color(0xfffdfdfd)],  // Gradient for "dolphin"
+    [Color(0xfffdfdfd), Color(0xfffdfdfd)],  // Gradient for "parrot"
+    [Color(0xfffdfdfd), Color(0xfffdfdfd)],  // Gradient for "elephant"
+    [Color(0xfffdfdfd), Color(0xfffdfdfd)],  // Gradient for "penguin"
+  ];
+
+  // Custom gradient colors for locked state (darker shade, matching the solid-color style)
+  List<List<Color>> lockedCardGradientColors = [
+    [Color(0xff757575), Color(0xff757575)],  // Locked gradient for "tiger"
+    [Color(0xff757575), Color(0xff757575)],  // Locked gradient for "dolphin"
+    [Color(0xff757575), Color(0xff757575)],  // Locked gradient for "parrot"
+    [Color(0xff757575), Color(0xff757575)],  // Locked gradient for "elephant"
+    [Color(0xff757575), Color(0xff757575)],  // Locked gradient for "penguin"
+  ];
+
+  // Feedback phrases to display
+  List<String> successPhrases = [
+    'Great job!',
+    'Fantastic!',
+    'You did it!',
+    'Amazing!',
+    'Excellent!'
+  ];
+
+  List<String> tryAgainPhrases = [
+    'Try again!',
+    'Almost there!',
+    'Let\'s try once more!',
+    'You can do it!',
+    'Keep trying!'
+  ];
+
   List<bool> wordRecognized = [false, false, false, false, false];
   List<bool> wordUnlocked = [true, false, false, false, false];
   List<bool> isListeningList = [false, false, false, false, false];
@@ -42,9 +90,9 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
   // Colors for animal theme
   final Color _primaryColor = const Color(0xFF4CAF50); // Green primary color
   final Color _accentColor = const Color(0xFFFF6D00);  // Orange accent color
-  final Color _backgroundColor1 = const Color(0xFF8BC34A); // Light green gradient start
-  final Color _backgroundColor2 = const Color(0xFF689F38); // Medium green gradient middle
-  final Color _backgroundColor3 = const Color(0xFF33691E); // Deep green gradient end
+  final Color _backgroundColor1 = const Color(0xFF8C66FF); // Dark purple gradient start
+  final Color _backgroundColor2 = const Color(0xFF7341E6); // Dark purple gradient middle
+  final Color _backgroundColor3 = const Color(0xFF5E35B1); // Dark purple gradient end
 
   @override
   void initState() {
@@ -59,6 +107,49 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
       duration: const Duration(seconds: 1),
       vsync: this,
     );
+
+    // Initialize animation controllers and state arrays for each word
+    for (int i = 0; i < words.length; i++) {
+      _successAnimControllers.add(
+        AnimationController(
+          duration: const Duration(milliseconds: 2000),
+          vsync: this,
+        ),
+      );
+
+      _errorAnimControllers.add(
+        AnimationController(
+          duration: const Duration(milliseconds: 2000),
+          vsync: this,
+        ),
+      );
+
+      _showSuccessAnimations.add(false);
+      _showErrorAnimations.add(false);
+      _showFeedbacks.add(false);
+      _currentFeedbacks.add('');
+
+      // Add listeners to reset UI after animations complete for each controller
+      _successAnimControllers[i].addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          setState(() {
+            _showSuccessAnimations[i] = false;
+            _showFeedbacks[i] = false;
+          });
+          _successAnimControllers[i].reset();
+        }
+      });
+
+      _errorAnimControllers[i].addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          setState(() {
+            _showErrorAnimations[i] = false;
+            _showFeedbacks[i] = false;
+          });
+          _errorAnimControllers[i].reset();
+        }
+      });
+    }
 
     // Listen to page changes
     _pageController.addListener(() {
@@ -154,11 +245,17 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
         _unlockNextWord();
       });
 
+      // Show success animation and feedback
+      _showSuccessAnimationAndFeedback(index);
+
       // Cancel inactivity timer for this word
       _cancelInactivityTimer(index);
 
       // Play success animation
       _confettiController.forward(from: 0.0);
+
+      // Play animal sound for additional reward
+      _playAnimalSound(words[index]);
 
       // Save progress
       SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -173,7 +270,7 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
         });
 
         // Show level completion dialog after a short delay
-        Future.delayed(const Duration(milliseconds: 500), () {
+        Future.delayed(const Duration(milliseconds: 2500), () {
           _showLevelCompletedDialog();
         });
       } else {
@@ -186,6 +283,46 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
         }
       }
     }
+  }
+
+  void _showSuccessAnimationAndFeedback(int index) {
+    // Select a random success phrase
+    final random = DateTime.now().millisecondsSinceEpoch % successPhrases.length;
+
+    setState(() {
+      _showSuccessAnimations[index] = true;
+      _showFeedbacks[index] = true;
+      _currentFeedbacks[index] = successPhrases[random];
+    });
+
+    // Play success animation only for this index
+    if (_successAnimControllers[index].isAnimating) {
+      _successAnimControllers[index].stop();
+    }
+    _successAnimControllers[index].forward();
+
+    // Speak the feedback
+    _flutterTts.speak("${successPhrases[random]} You said ${words[index]} correctly!");
+  }
+
+  void _showErrorAnimationAndFeedback(int index) {
+    // Select a random try again phrase
+    final random = DateTime.now().millisecondsSinceEpoch % tryAgainPhrases.length;
+
+    setState(() {
+      _showErrorAnimations[index] = true;
+      _showFeedbacks[index] = true;
+      _currentFeedbacks[index] = tryAgainPhrases[random];
+    });
+
+    // Play error animation only for this index
+    if (_errorAnimControllers[index].isAnimating) {
+      _errorAnimControllers[index].stop();
+    }
+    _errorAnimControllers[index].forward();
+
+    // Speak the feedback
+    _flutterTts.speak("${tryAgainPhrases[random]} Let's try saying ${words[index]} again.");
   }
 
   void _unlockNextWord() {
@@ -209,6 +346,17 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
     // Cancel any running inactivity timer
     _cancelInactivityTimer(index);
 
+    // Cancel any animations for this specific index if they're showing
+    if (_showSuccessAnimations[index] || _showErrorAnimations[index]) {
+      setState(() {
+        _showSuccessAnimations[index] = false;
+        _showErrorAnimations[index] = false;
+        _showFeedbacks[index] = false;
+      });
+      _successAnimControllers[index].reset();
+      _errorAnimControllers[index].reset();
+    }
+
     bool available = await _speech.initialize(
       onStatus: (status) => print('Status: $status'),
       onError: (error) => print('Error: $error'),
@@ -226,27 +374,12 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
             if (recognizedWord.contains(words[index])) {
               _markWordAsRecognized(words[index]);
               _stopListening(index);
-
-              // Provide positive feedback
-              _flutterTts.speak("Great job saying ${words[index]}!");
-
-              // Play animal sound for additional reward
-              _playAnimalSound(words[index]);
             } else if (recognizedWord.isNotEmpty) {
               // Incorrect word was said
               _stopListening(index);
 
-              // Provide guidance
-              _flutterTts.speak("Let's try again. Say ${words[index]}.");
-
-              // Show visual feedback
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("Try again! Please say '${words[index]}'"),
-                  backgroundColor: Colors.orange,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+              // Show error animation and feedback
+              _showErrorAnimationAndFeedback(index);
 
               // Restart inactivity timer
               _startInactivityTimer(index);
@@ -258,9 +391,8 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
   }
 
   void _playAnimalSound(String animal) async {
-    // This is a placeholder function - in a real implementation,
-    // you would play a specific sound file for each animal
-    // For example: await audioPlayer.play('assets/sounds/$animal.mp3');
+    // Placeholder function - in a real implementation, play specific sound files
+    // e.g., await audioPlayer.play('assets/sounds/$animal.mp3');
     print('Playing $animal sound');
   }
 
@@ -296,51 +428,82 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.white,
+          title: ShaderMask(
+            shaderCallback: (bounds) => LinearGradient(
+              colors: [Color(0xFF845BCD), Color(0xFF693DB8)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ).createShader(bounds),
+            child: const Text(
+              'LEVEL COMPLETED!',
+              style: TextStyle(
+                fontFamily: 'Impact',
+                fontSize: 24,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            height: 300,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.pets, color: Colors.amber, size: 80),
-                const SizedBox(height: 20),
-                const Text(
-                  "Amazing Work!",
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
+          contentPadding: const EdgeInsets.all(20),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 200,
+                child: Lottie.asset(
+                  'assets/Lottie/penguin.json',
+                  repeat: true,
+                  reverse: false,
+                  animate: true,
                 ),
-                const SizedBox(height: 10),
-                const Text(
-                  "You've completed Level 5!",
-                  style: TextStyle(fontSize: 18),
-                  textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                "Level 6 has been unlocked",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                  fontSize: 16,
+                  color: const Color(0xFF323232),
                 ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.only(left: 218.0),
+                child: SizedBox(
+                  width: 100,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF8E67D5), Color(0xFF6638B6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(), // Only pop the dialog
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: Text(
+                        "Got it!",
+                        style: GoogleFonts.nunito(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text(
-                    "Continue",
-                    style: TextStyle(fontSize: 18, color: Colors.white),
-                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -353,6 +516,18 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
     _flutterTts.stop();
     _pageController.dispose();
     _confettiController.dispose();
+
+    // Stop and dispose of all success animation controllers
+    for (var controller in _successAnimControllers) {
+      controller.stop();
+      controller.dispose();
+    }
+
+    // Stop and dispose of all error animation controllers
+    for (var controller in _errorAnimControllers) {
+      controller.stop();
+      controller.dispose();
+    }
 
     // Cancel all inactivity timers
     for (int i = 0; i < inactivityTimers.length; i++) {
@@ -369,10 +544,6 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text(
-          'Level 5: Animal Words',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
-        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
@@ -395,7 +566,7 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
                         SizedBox(height: 8),
                         Text("3. When you say it correctly, you'll hear the animal sound!"),
                         SizedBox(height: 8),
-                        Text("4. Complete all animals to finish the level"),
+                        Text("4. You can practice completed words any time!"),
                       ],
                     ),
                     actions: [
@@ -422,80 +593,182 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
         child: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 20),
-
               // Progress section
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.only(left: 20, right: 20),
                 child: Column(
                   children: [
-                    // Progress label with paw prints instead of stars
+                    Row(
+                      children: [
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Text(
+                              ' L E V E L',
+                              style: TextStyle(
+                                fontFamily: "Impact",
+                                fontSize: 20,
+                                color: const Color(0xFFFFF780),
+                                height: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(width: 8),
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Text(
+                              '  5',
+                              style: TextStyle(
+                                fontFamily: "Impact",
+                                fontSize: 20,
+                                color: const Color(0xFFFDF57F),
+                                height: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Text(
+                          'Animal Words'.toUpperCase(),
+                          style: TextStyle(
+                            fontFamily: "Impact",
+                            fontSize: 40,
+                            color: const Color(0xFFFDF57F),
+                            height: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          "Your Progress: ${(progress * 100).toInt()}%",
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
                         Row(
                           children: List.generate(5, (index) {
-                            return Icon(
-                              index < (progress * 5).floor() ? Icons.pets : Icons.pets_outlined,
-                              color: index < (progress * 5).floor() ? Colors.amber : Colors.white70,
-                              size: 24,
+                            bool isFilled = index < (progress * 5).floor();
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Icon(
+                                  isFilled ? Icons.star : Icons.star_border,
+                                  color: Colors.black,
+                                  size: 28,
+                                ),
+                                Icon(
+                                  isFilled ? Icons.star : Icons.star_border,
+                                  color: isFilled ? Colors.amber : Colors.white70,
+                                  size: 24,
+                                ),
+                              ],
                             );
                           }),
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 10),
-
-                    // Improved progress bar
-                    Stack(
-                      children: [
-                        // Background
-                        Container(
-                          height: 45,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(12.5),
+                    Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
                           ),
-                        ),
-                        // Progress fill
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          height: 45,
-                          width: MediaQuery.of(context).size.width * 0.9 * progress,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Color(0xFF8BC34A), Color(0xFF33691E)], // Light green to deep green
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _accentColor.withOpacity(0.5),
-                                blurRadius: 6,
-                                offset: const Offset(0, 3),
+                        ],
+                      ),
+                      child: Stack(
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOut,
+                            height: 36,
+                            width: MediaQuery.of(context).size.width * 0.9 * progress,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Color(0xFFFFEB3B),
+                                  Color(0xFFFFF780),
+                                  Color(0xFFFFAB40),
+                                ],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
                               ),
-                            ],
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Color(0xFF7A34AA).withOpacity(0.6),
+                                  blurRadius: 6,
+                                  spreadRadius: -1,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                          if (progress > 0.05)
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                height: 6,
+                                width: MediaQuery.of(context).size.width * 0.9 * progress,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.white.withOpacity(0.0),
+                                      Colors.white.withOpacity(0.2),
+                                      Colors.white.withOpacity(0.0),
+                                    ],
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: List.generate(4, (index) {
+                              final markerProgress = (index + 1) / 5;
+                              final markerReached = progress >= markerProgress;
+                              return Container(
+                                width: 2,
+                                height: 8,
+                                margin: EdgeInsets.only(top: 4),
+                                decoration: BoxDecoration(
+                                  color: markerReached
+                                      ? Colors.white.withOpacity(0.6)
+                                      : Colors.white.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(9),
+                                ),
+                              );
+                            }),
+                          ),
+                          Center(
+                            child: Text(
+                              "${(progress * 100).toInt()}%",
+                              style: const TextStyle(
+                                fontFamily: "Impact",
+                                fontSize: 20,
+                                color: Color(0x80fdf7f7),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-
               const SizedBox(height: 30),
-
-              // Word Cards as PageView
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
@@ -505,8 +778,6 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
                   },
                 ),
               ),
-
-              // Navigation dots
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Row(
@@ -536,6 +807,9 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
     final bool isCurrentWordUnlocked = wordUnlocked[index];
     final bool isCurrentWordRecognized = wordRecognized[index];
 
+    // Determine if the asset is an image or a Lottie animation based on the file extension
+    bool isLottie = wordImages[index].endsWith('.json');
+
     return AnimatedScale(
       scale: _currentPage == index ? 1.0 : 0.9,
       duration: const Duration(milliseconds: 200),
@@ -556,12 +830,12 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
               borderRadius: BorderRadius.circular(24),
               gradient: isCurrentWordUnlocked
                   ? LinearGradient(
-                colors: [Color(0xffffffff), Colors.grey.shade300],
+                colors: cardGradientColors[index],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               )
                   : LinearGradient(
-                colors: [Colors.grey.shade700, Colors.grey.shade900],
+                colors: lockedCardGradientColors[index],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -569,7 +843,6 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Word badge at the top
                 if (isCurrentWordRecognized)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -577,7 +850,7 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
                       color: Colors.green,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.check_circle, color: Colors.white, size: 16),
@@ -592,195 +865,211 @@ class _LevelFiveScreenState extends State<LevelFiveScreen> with TickerProviderSt
                       ],
                     ),
                   ),
-
                 const SizedBox(height: 20),
-
-                // Word image in a decorative frame with animal footprint pattern
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Decorative border
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: _primaryColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(
-                          color: _primaryColor.withOpacity(0.5),
-                          width: 2,
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Stack(
+                      children: [
+                        // Render either an image or a Lottie animation
+                        isLottie
+                            ? SizedBox(
+                          height: 220,
+                          width: 220,
+                          child: Lottie.asset(
+                            wordImages[index],
+                           // fit: BoxFit.cover,
+                            repeat: true,
+                            animate: isCurrentWordUnlocked, // Animate only if unlocked
+                          ),
+                        )
+                            : Image.asset(
+                          wordImages[index],
+                          height: 220,
+                          width: 220,
+                          fit: BoxFit.cover,
+                          color: isCurrentWordUnlocked ? null : Colors.grey.withOpacity(0.7),
+                          colorBlendMode: isCurrentWordUnlocked ? null : BlendMode.saturation,
                         ),
-                      ),
-                      child: const SizedBox(
-                        height: 220,
-                        width: 220,
+                        // Apply blur effect for locked words
+                        if (!isCurrentWordUnlocked)
+                          Positioned.fill(
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+                              child: Container(
+                                color: Colors.black.withOpacity(0.1),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  words[index].toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                    color: isCurrentWordUnlocked ? _primaryColor : Colors.white60,
+                  ),
+                ),
+                if (isCurrentWordRecognized && isCurrentWordUnlocked && !(_showSuccessAnimations[index] || _showErrorAnimations[index]))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      "Tap buttons below to practice!",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontStyle: FontStyle.italic,
+                        color: _primaryColor.withOpacity(0.8),
                       ),
                     ),
-
-                    // Actual image
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                  ),
+                if (_showFeedbacks[index])
+                  AnimatedOpacity(
+                    opacity: _showFeedbacks[index] ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 300),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Text(
+                        _currentFeedbacks[index],
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: _showSuccessAnimations[index]
+                              ? Colors.green
+                              : _showErrorAnimations[index]
+                              ? Colors.red
+                              : _primaryColor,
+                        ),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Stack(
+                    ),
+                  ),
+                const SizedBox(height: 30),
+                if (isCurrentWordUnlocked)
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      AnimatedOpacity(
+                        opacity: (_showSuccessAnimations[index] || _showErrorAnimations[index]) ? 0.0 : 1.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Image.asset(
-                              wordImages[index],
-                              height: 220,
-                              width: 220,
-                              fit: BoxFit.cover,
-                              color: isCurrentWordUnlocked ? null : Colors.grey.withOpacity(0.7),
-                              colorBlendMode: isCurrentWordUnlocked ? null : BlendMode.saturation,
-                            ),
-                            if (!isCurrentWordUnlocked)
-                              Positioned.fill(
-                                child: BackdropFilter(
-                                  filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-                                  child: Container(
-                                    color: Colors.black.withOpacity(0.1),
-                                  ),
+                            InkWell(
+                              onTap: () => _speakWord(words[index]),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: _primaryColor,
+                                  borderRadius: BorderRadius.circular(18),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _primaryColor.withOpacity(0.4),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    const Icon(Icons.volume_up, color: Colors.white, size: 32),
+                                    const SizedBox(height: 6),
+                                    const Text(
+                                      "HEAR",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
+                            ),
+                            const SizedBox(width: 24),
+                            InkWell(
+                              onTap: isListeningList[index]
+                                  ? () => _stopListening(index)
+                                  : () => _startListening(index),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: isListeningList[index] ? Colors.red : _accentColor,
+                                  borderRadius: BorderRadius.circular(18),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (isListeningList[index] ? Colors.red : _accentColor).withOpacity(0.4),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      isListeningList[index] ? Icons.stop : Icons.mic,
+                                      color: Colors.white,
+                                      size: 32,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      isListeningList[index] ? "STOP" : "SPEAK",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
-                // Word display with animal icon
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (isCurrentWordUnlocked)
-                      Icon(
-                        Icons.pets,
-                        color: _primaryColor,
-                        size: 24,
-                      ),
-                    const SizedBox(width: 8),
-                    Text(
-                      words[index].toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
-                        color: isCurrentWordUnlocked ? _primaryColor : Colors.white60,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (isCurrentWordUnlocked)
-                      Icon(
-                        Icons.pets,
-                        color: _primaryColor,
-                        size: 24,
-                      ),
-                  ],
-                ),
-
-                const SizedBox(height: 30),
-
-                // Action buttons
-                if (isCurrentWordUnlocked)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Hear button
-                      InkWell(
-                        onTap: () => _speakWord(words[index]),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: _primaryColor,
-                            borderRadius: BorderRadius.circular(18),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _primaryColor.withOpacity(0.4),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              const Icon(Icons.volume_up, color: Colors.white, size: 32),
-                              const SizedBox(height: 6),
-                              const Text(
-                                "HEAR",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
+                      if (_showSuccessAnimations[index])
+                        AnimatedOpacity(
+                          opacity: _showSuccessAnimations[index] ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 700),
+                          child: SizedBox(
+                            width: 150,
+                            height: 150,
+                            child: Lottie.asset(
+                              'assets/Lottie/correct_animation.json',
+                              controller: _successAnimControllers[index],
+                              repeat: false,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
-                      ),
-
-                      const SizedBox(width: 24),
-
-                      // Speak button
-                      InkWell(
-                        onTap: isListeningList[index]
-                            ? () => _stopListening(index)
-                            : () => _startListening(index),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isListeningList[index] ? Colors.red : _accentColor,
-                            borderRadius: BorderRadius.circular(18),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (isListeningList[index] ? Colors.red : _accentColor).withOpacity(0.4),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              Icon(
-                                  isListeningList[index] ? Icons.stop : Icons.mic,
-                                  color: Colors.white,
-                                  size: 32
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                isListeningList[index] ? "STOP" : "SPEAK",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
+                      if (_showErrorAnimations[index])
+                        AnimatedOpacity(
+                          opacity: _showErrorAnimations[index] ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 4000),
+                          child: SizedBox(
+                            width: 180,
+                            height: 130,
+                            child: Lottie.asset(
+                              'assets/Lottie/error_og.json',
+                              controller: _errorAnimControllers[index],
+                              repeat: true,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
-
-                // Lock icon and text for locked words
                 if (!isCurrentWordUnlocked)
                   Column(
                     children: [
                       const Icon(
-                          Icons.lock,
-                          color: Colors.white70,
-                          size: 50
+                        Icons.lock,
+                        color: Colors.white70,
+                        size: 50,
                       ),
                       const SizedBox(height: 10),
                       Text(
