@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/drawable-anydpi-v21/ic_call_answer_video.xml",
+        "source": "app.meedu.flutter_facebook_auth-core-1.13.1-6:/drawable-anydpi-v21/ic_call_answer_video.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/drawable-anydpi-v21/ic_call_answer_video_low.xml",
+        "source": "app.meedu.flutter_facebook_auth-core-1.13.1-6:/drawable-anydpi-v21/ic_call_answer_video_low.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/drawable-anydpi-v21/ic_call_decline_low.xml",
+        "source": "app.meedu.flutter_facebook_auth-core-1.13.1-6:/drawable-anydpi-v21/ic_call_decline_low.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/drawable-anydpi-v21/ic_call_answer_low.xml",
+        "source": "app.meedu.flutter_facebook_auth-core-1.13.1-6:/drawable-anydpi-v21/ic_call_answer_low.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/drawable-anydpi-v21/ic_call_answer.xml",
+        "source": "app.meedu.flutter_facebook_auth-core-1.13.1-6:/drawable-anydpi-v21/ic_call_answer.xml"
+    },
+    {
+        "merged": "app.meedu.flutter_facebook_auth-merged_res-33:/drawable-anydpi-v21/ic_call_decline.xml",
+        "source": "app.meedu.flutter_facebook_auth-core-1.13.1-6:/drawable-anydpi-v21/ic_call_decline.xml"
+    }
+]
