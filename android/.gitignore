@@ -1,3 +1,4 @@
+You said:
 gradle-wrapper.jar
 /.gradle
 /captures/
@@ -10,4 +11,4 @@ GeneratedPluginRegistrant.java
 # See https://flutter.dev/docs/deployment/android#reference-the-keystore-from-the-app
 key.properties
 **/*.keystore
-**/*.jks
+**/*.jks this is present in .gitignore
